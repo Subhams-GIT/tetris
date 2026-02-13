@@ -41,10 +41,13 @@ typedef struct shape
 } shape;
 
 void drawShape(shape *s);
-shape shapesGenerated[100000];
+shape shapesGenerated[100];
 int generateRandomValue(int start, int end, int step_size)
 {
-  return end - start + GetRandomValue(0, 10) * step_size;
+  int columns = (grid_end_x - grid_start_x) / 20;
+  int randomCol = GetRandomValue(0, columns - 3);
+  int startx = grid_start_x + randomCol * 20;
+  return startx;
 }
 
 void drawGrid()
@@ -77,14 +80,31 @@ Color RandomColor()
   };
 }
 
-void updateShape(shape *s)
+void updateShape(shape *s, Image screen)
 {
-  if (s->c.starty + 60 == grid_end_y)
+  
+  if (s->c.starty + 40 == grid_end_y)
     s->placed = true;
   if (!s->placed)
-  {
     s->c.starty += 20;
-  }
+}
+
+void rotateShape(shape *s)
+{
+}
+
+void moveShapeRight(shape *s)
+{
+  if (s->c.startx + 80 >= grid_end_x)
+    return;
+  s->c.startx += 20;
+}
+
+void moveShapeleft(shape *s)
+{
+  if (s->c.startx <= grid_start_x)
+    return;
+  s->c.startx -= 20;
 }
 
 void drawShape(shape *s)
@@ -98,8 +118,8 @@ void drawShape(shape *s)
       if (s->l.squares[row][col] == 1)
       {
         DrawRectangle(
-            s->c.startx + row * 20,
-            s->c.starty + col * 20,
+            s->c.startx + col * 20,
+            s->c.starty + row * 20,
             20,
             20,
             s->color);
@@ -138,20 +158,28 @@ int main()
 
   InitWindow(WIDTH, HEIGHT, "tetris");
   SetTargetFPS(60);
+  Image screenCapture = LoadImageFromScreen();
   while (!WindowShouldClose())
   {
     BeginDrawing();
-    ClearBackground(BLACK); 
+    ClearBackground(BLACK);
     drawGrid();
     if (index == 0 || shapesGenerated[index - 1].placed == true)
     {
       generateRandomBlocks();
     }
+    if (index > 0)
+    {
+      if (IsKeyDown(KEY_RIGHT))
+        moveShapeRight(&shapesGenerated[index - 1]);
+
+      if (IsKeyDown(KEY_LEFT))
+        moveShapeleft(&shapesGenerated[index - 1]);
+    }
     if (index > 0 && shapesGenerated[index - 1].placed == false)
     {
       WaitTime(1);
-      drawShape(&shapesGenerated[index - 1]);
-      updateShape(&shapesGenerated[index - 1]);
+      updateShape(&shapesGenerated[index - 1], screenCapture);
     }
     for (int i = 0; i < index; i++)
     {
