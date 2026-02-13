@@ -40,7 +40,7 @@ typedef struct shape
   bool started;
 } shape;
 
-void drawShape(shape *s, Color c);
+void drawShape(shape *s);
 shape shapesGenerated[100000];
 int generateRandomValue(int start, int end, int step_size)
 {
@@ -77,35 +77,41 @@ Color RandomColor()
   };
 }
 
-
 void updateShape(shape *s)
 {
-
-    if (!s->placed)
-    {
-      s->c.starty += 1;
-    }
+  if (s->c.starty + 60 == grid_end_y)
+    s->placed = true;
+  if (!s->placed)
+  {
+    s->c.starty += 20;
+  }
 }
 
-void drawShape(shape *s, Color c)
+void drawShape(shape *s)
 {
-  printf(" startx: %d, starty:%d\n", s->c.startx, s->c.starty);
+  printf("\nstartx: %d, starty:%d", s->c.startx, s->c.starty);
   for (int row = 0; row < 3; row++)
   {
     for (int col = 0; col < 3; col++)
     {
+
       if (s->l.squares[row][col] == 1)
       {
         DrawRectangle(
+            s->c.startx + row * 20,
+            s->c.starty + col * 20,
+            20,
+            20,
+            s->color);
+        DrawRectangleLines(
             s->c.startx + col * 20,
             s->c.starty + row * 20,
             20,
             20,
-            s->color);
+            WHITE);
       }
     }
   }
-
 }
 
 void generateRandomBlocks()
@@ -121,11 +127,10 @@ void generateRandomBlocks()
       .color = color,
       .c = c,
       .placed = false,
-      .l = letters[GetRandomValue(0,5)],
+      .l = letters[GetRandomValue(0, 5)],
   };
   shapesGenerated[index] = s;
   index++;
-  drawShape(&s, color);
 }
 
 int main()
@@ -136,11 +141,22 @@ int main()
   while (!WindowShouldClose())
   {
     BeginDrawing();
+    ClearBackground(BLACK); 
     drawGrid();
-    if (index == 0 || shapesGenerated[index - 1].placed == true){
+    if (index == 0 || shapesGenerated[index - 1].placed == true)
+    {
       generateRandomBlocks();
     }
-    updateShape(&shapesGenerated[index-1]);
+    if (index > 0 && shapesGenerated[index - 1].placed == false)
+    {
+      WaitTime(1);
+      drawShape(&shapesGenerated[index - 1]);
+      updateShape(&shapesGenerated[index - 1]);
+    }
+    for (int i = 0; i < index; i++)
+    {
+      drawShape(&shapesGenerated[i]);
+    }
     EndDrawing();
   }
   return 0;
