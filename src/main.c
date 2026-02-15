@@ -5,12 +5,9 @@
 
 #define WIDTH 1000
 #define HEIGHT 1000
-
-int grid_start_x;
-int grid_start_y;
-int grid_end_x;
-int grid_end_y;
-int index = 0;
+#define CELL_SIZE 20
+#define GRID_COLS 12
+#define GRID_ROWS 21
 
 typedef struct coordinates
 {
@@ -24,6 +21,22 @@ typedef struct letter
   int squares[3][3];
 } letter;
 
+typedef struct shape
+{
+  Color color;
+  coordinates c;
+  bool placed;
+  letter l;
+} shape;
+
+bool key_pressed = false;
+int grid_start_x;
+int grid_start_y;
+int grid_end_x;
+int grid_end_y;
+int index = 0;
+int grid[21][12];
+
 letter letters[] = {
     {symbol : 'T', squares : {{0, 1, 0}, {1, 1, 1}, {0, 0, 0}}},
     {symbol : 'J', squares : {{1, 0, 0}, {1, 1, 1}, {0, 0, 0}}},
@@ -31,17 +44,10 @@ letter letters[] = {
     {symbol : 'S', squares : {{0, 1, 1}, {1, 1, 0}, {0, 0, 0}}},
     {symbol : 'Z', squares : {{1, 1, 0}, {0, 1, 1}, {0, 0, 0}}}};
 
-typedef struct shape
-{
-  Color color;
-  coordinates c;
-  bool placed;
-  letter l;
-  bool started;
-} shape;
+shape shapesGenerated[100];
 
 void drawShape(shape *s);
-shape shapesGenerated[100];
+
 int generateRandomValue(int start, int end, int step_size)
 {
   int columns = (grid_end_x - grid_start_x) / 20;
@@ -52,6 +58,7 @@ int generateRandomValue(int start, int end, int step_size)
 
 void drawGrid()
 {
+
   /* vertical lines */
   for (int i = WIDTH / 4; i < WIDTH / (2); i += 20)
   {
@@ -63,7 +70,6 @@ void drawGrid()
   {
     DrawLine(WIDTH / 4, i, WIDTH / 2 - 10, i, WHITE);
   }
-
   grid_start_x = WIDTH / 4;
   grid_start_y = 80;
   grid_end_x = WIDTH / 2;
@@ -80,17 +86,62 @@ Color RandomColor()
   };
 }
 
-void updateShape(shape *s, Image screen)
+void updateShape(shape *s)
 {
-  
-  if (s->c.starty + 40 == grid_end_y)
-    s->placed = true;
-  if (!s->placed)
-    s->c.starty += 20;
-}
+  int baseCol = (s->c.startx - grid_start_x) / CELL_SIZE;
+  int baseRow = (s->c.starty - grid_start_y) / CELL_SIZE;
 
-void rotateShape(shape *s)
-{
+  // Check if moving down would collide
+  for (int row = 0; row < 3; row++)
+  {
+    for (int col = 0; col < 3; col++)
+    {
+      if (s->l.squares[row][col] == 1)
+      {
+        int nextRow = baseRow + row + 1;
+        int nextCol = baseCol + col;
+
+        // Bottom boundary
+        if (nextRow >= GRID_ROWS)
+        {
+          s->placed = true;
+          goto place_block;
+        }
+
+        // Collision with placed block
+        if (grid[nextRow][nextCol] == 1)
+        {
+          s->placed = true;
+          goto place_block;
+        }
+      }
+    }
+  }
+
+  // No collision → move down
+  s->c.starty += CELL_SIZE;
+  return;
+
+place_block:
+
+  // Lock shape into grid
+  for (int row = 0; row < 3; row++)
+  {
+    for (int col = 0; col < 3; col++)
+    {
+      if (s->l.squares[row][col] == 1)
+      {
+        int gridRow = baseRow + row;
+        int gridCol = baseCol + col;
+
+        if (gridRow >= 0 && gridRow < GRID_ROWS &&
+            gridCol >= 0 && gridCol < GRID_COLS)
+        {
+          grid[gridRow][gridCol] = 1;
+        }
+      }
+    }
+  }
 }
 
 void moveShapeRight(shape *s)
@@ -109,12 +160,10 @@ void moveShapeleft(shape *s)
 
 void drawShape(shape *s)
 {
-  printf("\nstartx: %d, starty:%d", s->c.startx, s->c.starty);
   for (int row = 0; row < 3; row++)
   {
     for (int col = 0; col < 3; col++)
     {
-
       if (s->l.squares[row][col] == 1)
       {
         DrawRectangle(
@@ -147,7 +196,7 @@ void generateRandomBlocks()
       .color = color,
       .c = c,
       .placed = false,
-      .l = letters[GetRandomValue(0, 5)],
+      .l = letters[GetRandomValue(0, 4)],
   };
   shapesGenerated[index] = s;
   index++;
@@ -155,10 +204,8 @@ void generateRandomBlocks()
 
 int main()
 {
-
   InitWindow(WIDTH, HEIGHT, "tetris");
-  SetTargetFPS(60);
-  Image screenCapture = LoadImageFromScreen();
+  SetTargetFPS(10);
   while (!WindowShouldClose())
   {
     BeginDrawing();
@@ -170,16 +217,26 @@ int main()
     }
     if (index > 0)
     {
+
+      if (IsKeyReleased(KEY_RIGHT) || IsKeyReleased(KEY_LEFT))
+        key_pressed = false;
       if (IsKeyDown(KEY_RIGHT))
+      {
+        key_pressed = true;
         moveShapeRight(&shapesGenerated[index - 1]);
+      }
 
       if (IsKeyDown(KEY_LEFT))
+      {
+        key_pressed = true;
         moveShapeleft(&shapesGenerated[index - 1]);
+      }
     }
     if (index > 0 && shapesGenerated[index - 1].placed == false)
     {
       WaitTime(1);
-      updateShape(&shapesGenerated[index - 1], screenCapture);
+      if (!key_pressed)
+        updateShape(&shapesGenerated[index - 1]);
     }
     for (int i = 0; i < index; i++)
     {
