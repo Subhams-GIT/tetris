@@ -2,6 +2,7 @@
 #include "resource_dir.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #define WIDTH 1000
 #define HEIGHT 1000
@@ -91,7 +92,6 @@ void updateShape(shape *s)
   int baseCol = (s->c.startx - grid_start_x) / CELL_SIZE;
   int baseRow = (s->c.starty - grid_start_y) / CELL_SIZE;
 
-  // Check if moving down would collide
   for (int row = 0; row < 3; row++)
   {
     for (int col = 0; col < 3; col++)
@@ -100,15 +100,12 @@ void updateShape(shape *s)
       {
         int nextRow = baseRow + row + 1;
         int nextCol = baseCol + col;
-
-        // Bottom boundary
         if (nextRow >= GRID_ROWS)
         {
           s->placed = true;
           goto place_block;
         }
 
-        // Collision with placed block
         if (grid[nextRow][nextCol] == 1)
         {
           s->placed = true;
@@ -117,8 +114,6 @@ void updateShape(shape *s)
       }
     }
   }
-
-  // No collision → move down
   s->c.starty += CELL_SIZE;
   return;
 
@@ -183,15 +178,34 @@ void drawShape(shape *s)
   }
 }
 
+void draw_successive_blocks()
+{
+  DrawRectangle(grid_end_x + 60, grid_start_y + 150, 200, 400, BLACK);
+  DrawRectangleLines(grid_end_x + 60, grid_start_y + 150, 200, 250, WHITE);
+}
+
+void draw_point_section(char *text)
+{
+  DrawRectangle(grid_end_x + 60, grid_start_y, 100, 100, BLACK);
+  DrawRectangleLines(grid_end_x + 60, grid_start_y, 100, 100, WHITE);
+  DrawText(text, grid_end_x + 100, grid_start_y + 25, 50, WHITE);
+}
+
 void generateRandomBlocks()
 {
   Color color = RandomColor();
   int startx = generateRandomValue(grid_start_x, grid_end_x, 20);
-  coordinates c = {
-      .startx = startx,
-      .starty = 80,
-  };
-
+  coordinates c;
+  if (index > 0)
+  {
+    c.startx = shapesGenerated[index].c.startx;
+    c.starty = shapesGenerated[index].c.starty;
+  }
+  else
+  {
+    c.startx = grid_end_x + 60;
+    c.starty = grid_start_y;
+  }
   shape s = {
       .color = color,
       .c = c,
@@ -202,46 +216,77 @@ void generateRandomBlocks()
   index++;
 }
 
+void draw_timer(int seconds)
+{
+  char text[12];
+  snprintf(text, sizeof(text), "%d", seconds);
+  DrawText(text, WIDTH / 2 - 10, HEIGHT / 2 - 20, 60, WHITE);
+}
+
 int main()
 {
+  int countdown = 3;
+  double startTime = GetTime();
+  bool gameStarted = false;
+  int score = 0;
   InitWindow(WIDTH, HEIGHT, "tetris");
   SetTargetFPS(10);
   while (!WindowShouldClose())
   {
     BeginDrawing();
     ClearBackground(BLACK);
-    drawGrid();
-    if (index == 0 || shapesGenerated[index - 1].placed == true)
-    {
-      generateRandomBlocks();
-    }
-    if (index > 0)
-    {
 
-      if (IsKeyReleased(KEY_RIGHT) || IsKeyReleased(KEY_LEFT))
-        key_pressed = false;
-      if (IsKeyDown(KEY_RIGHT))
+    if (!gameStarted)
+    {
+      int elapsed = (int)(GetTime() - startTime);
+      int remaining = countdown - elapsed;
+
+      if (remaining > 0)
       {
-        key_pressed = true;
-        moveShapeRight(&shapesGenerated[index - 1]);
+        draw_timer(remaining);
       }
-
-      if (IsKeyDown(KEY_LEFT))
+      else
       {
-        key_pressed = true;
-        moveShapeleft(&shapesGenerated[index - 1]);
+        gameStarted = true;
       }
     }
-    if (index > 0 && shapesGenerated[index - 1].placed == false)
+    else
     {
-      WaitTime(1);
-      if (!key_pressed)
-        updateShape(&shapesGenerated[index - 1]);
+      drawGrid();
+      draw_successive_blocks();
+      draw_point_section("0");
+
+      if (index == 0)
+        for (int i = 0; i < 4; i++)
+          generateRandomBlocks();
+      if (index > 0)
+      {
+        if (IsKeyReleased(KEY_RIGHT) || IsKeyReleased(KEY_LEFT))
+          key_pressed = false;
+        if (IsKeyDown(KEY_RIGHT))
+        {
+          key_pressed = true;
+          moveShapeRight(&shapesGenerated[index - 1]);
+        }
+
+        if (IsKeyDown(KEY_LEFT))
+        {
+          key_pressed = true;
+          moveShapeleft(&shapesGenerated[index - 1]);
+        }
+      }
+      if (index > 0 && shapesGenerated[index - 1].placed == false)
+      {
+        WaitTime(1);
+        if (!key_pressed)
+          updateShape(&shapesGenerated[index - 1]);
+      }
+      for (int i = 0; i < 4; i++)
+      {
+        drawShape(&shapesGenerated[i]);
+      }
     }
-    for (int i = 0; i < index; i++)
-    {
-      drawShape(&shapesGenerated[i]);
-    }
+
     EndDrawing();
   }
   return 0;
