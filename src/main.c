@@ -1,7 +1,7 @@
 #include "raylib.h"
 #include "resource_dir.h"
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 #define WIDTH 1000
@@ -36,12 +36,13 @@ int grid_start_y;
 int grid_end_x;
 int grid_end_y;
 int index = 0;
+int score = 0;
 int grid[21][12];
 
 letter letters[] = {
-    {symbol : 'T', squares : {{0, 1, 0}, {1, 1, 1}, {0, 0, 0}}},
-    {symbol : 'J', squares : {{1, 0, 0}, {1, 1, 1}, {0, 0, 0}}},
-    {symbol : 'L', squares : {{0, 0, 1}, {1, 1, 1}, {0, 0, 0}}},
+    {symbol : 'T', squares : {{1, 1, 1}, {0, 1, 0}, {0, 0, 0}}},
+    {symbol : 'J', squares : {{0, 0, 1}, {0, 0, 1}, {1, 1, 1}}},
+    {symbol : 'L', squares : {{1, 0, 0}, {1, 1, 1}, {0, 0, 0}}},
     {symbol : 'S', squares : {{0, 1, 1}, {1, 1, 0}, {0, 0, 0}}},
     {symbol : 'Z', squares : {{1, 1, 0}, {0, 1, 1}, {0, 0, 0}}}};
 
@@ -55,6 +56,29 @@ int generateRandomValue(int start, int end, int step_size)
   int randomCol = GetRandomValue(0, columns - 3);
   int startx = grid_start_x + randomCol * 20;
   return startx;
+}
+
+void rotate_matrix(shape *s)
+{
+  int temp[3][3];
+  for (int i = 0; i < 3; i++)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      temp[j][i]=s->l.squares[i][j];
+    }
+  }
+
+  for (int i = 0; i < 3; i++)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      s->l.squares[i][j]=temp[i][2-j];
+    }
+
+  }
+
+
 }
 
 void drawGrid()
@@ -71,6 +95,7 @@ void drawGrid()
   {
     DrawLine(WIDTH / 4, i, WIDTH / 2 - 10, i, WHITE);
   }
+
   grid_start_x = WIDTH / 4;
   grid_start_y = 80;
   grid_end_x = WIDTH / 2;
@@ -129,8 +154,8 @@ place_block:
         int gridRow = baseRow + row;
         int gridCol = baseCol + col;
 
-        if (gridRow >= 0 && gridRow < GRID_ROWS &&
-            gridCol >= 0 && gridCol < GRID_COLS)
+        if (gridRow >= 0 && gridRow < GRID_ROWS && gridCol >= 0 &&
+            gridCol < GRID_COLS)
         {
           grid[gridRow][gridCol] = 1;
         }
@@ -161,18 +186,10 @@ void drawShape(shape *s)
     {
       if (s->l.squares[row][col] == 1)
       {
-        DrawRectangle(
-            s->c.startx + col * 20,
-            s->c.starty + row * 20,
-            20,
-            20,
-            s->color);
-        DrawRectangleLines(
-            s->c.startx + col * 20,
-            s->c.starty + row * 20,
-            20,
-            20,
-            WHITE);
+        DrawRectangle(s->c.startx + col * 20, s->c.starty + row * 20, 20, 20,
+                      s->color);
+        DrawRectangleLines(s->c.startx + col * 20, s->c.starty + row * 20, 20,
+                           20, WHITE);
       }
     }
   }
@@ -196,16 +213,9 @@ void generateRandomBlocks()
   Color color = RandomColor();
   int startx = generateRandomValue(grid_start_x, grid_end_x, 20);
   coordinates c;
-  if (index > 0)
-  {
-    c.startx = shapesGenerated[index].c.startx;
-    c.starty = shapesGenerated[index].c.starty;
-  }
-  else
-  {
-    c.startx = grid_end_x + 60;
-    c.starty = grid_start_y;
-  }
+  c.startx = startx;
+  c.starty = 80;
+
   shape s = {
       .color = color,
       .c = c,
@@ -219,8 +229,64 @@ void generateRandomBlocks()
 void draw_timer(int seconds)
 {
   char text[12];
-  snprintf(text, sizeof(text), "%d", seconds);
+  sprintf(text, "%d", seconds);
   DrawText(text, WIDTH / 2 - 10, HEIGHT / 2 - 20, 60, WHITE);
+}
+
+int *check_for_clear()
+{
+  int capacity = 10;
+  int indx = 0;
+  int *arr = (int *)calloc(capacity, sizeof(int));
+
+  for (int i = GRID_ROWS - 1; i >= 0; i--)
+  {
+    int full = 1;
+
+    for (int j = 0; j < GRID_COLS; j++)
+    {
+      if (grid[i][j] == 0)
+      {
+        full = 0;
+        break;
+      }
+    }
+
+    if (full)
+    {
+      if (indx >= capacity)
+      {
+        capacity *= 2;
+        arr = realloc(arr, capacity * sizeof(int));
+      }
+
+      arr[indx++] = i;
+    }
+  }
+
+  arr[indx] = -1; // sentinel to mark end
+  return arr;
+}
+
+void clear_rows(int *arr)
+{
+  for (int i = 0; arr[i] != -1; i++) // use sentinel
+  {
+    int row = arr[i];
+
+    for (int col = 0; col < GRID_COLS; col++) // correct grid cols
+    {
+      int x = grid_start_x + col * CELL_SIZE;
+      int y = grid_start_y + row * CELL_SIZE;
+
+      DrawRectangle(x, y, CELL_SIZE, CELL_SIZE, BLACK);
+      DrawRectangleLines(x, y, CELL_SIZE, CELL_SIZE, WHITE);
+
+      grid[row][col] = 0; // clear grid properly
+    }
+  }
+  score += sizeof(arr) / sizeof(arr[0]);
+  free(arr);
 }
 
 int main()
@@ -228,14 +294,16 @@ int main()
   int countdown = 3;
   double startTime = GetTime();
   bool gameStarted = false;
-  int score = 0;
+
   InitWindow(WIDTH, HEIGHT, "tetris");
-  SetTargetFPS(10);
+  SetTargetFPS(20);
   while (!WindowShouldClose())
   {
     BeginDrawing();
     ClearBackground(BLACK);
-
+    int *arr = check_for_clear();
+    if (arr[0] != 0)
+      clear_rows(arr);
     if (!gameStarted)
     {
       int elapsed = (int)(GetTime() - startTime);
@@ -253,16 +321,19 @@ int main()
     else
     {
       drawGrid();
-      draw_successive_blocks();
       draw_point_section("0");
-
-      if (index == 0)
-        for (int i = 0; i < 4; i++)
-          generateRandomBlocks();
+      if (index == 0 || shapesGenerated[index - 1].placed == true)
+      {
+        generateRandomBlocks();
+      }
       if (index > 0)
       {
         if (IsKeyReleased(KEY_RIGHT) || IsKeyReleased(KEY_LEFT))
           key_pressed = false;
+        if (IsKeyPressed(KEY_UP))
+        {
+          rotate_matrix(&shapesGenerated[index - 1]);
+        }
         if (IsKeyDown(KEY_RIGHT))
         {
           key_pressed = true;
@@ -281,7 +352,7 @@ int main()
         if (!key_pressed)
           updateShape(&shapesGenerated[index - 1]);
       }
-      for (int i = 0; i < 4; i++)
+      for (int i = 0; i < 100; i++)
       {
         drawShape(&shapesGenerated[i]);
       }
